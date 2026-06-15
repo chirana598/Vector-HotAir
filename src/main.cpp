@@ -566,8 +566,8 @@ void FanControl()
 //  SLEEP CHECK
 // ============================================================================
 
-//  stand → sleep sets standSleep=true  → auto-wakes when lifted
-//  timer → sleep sets standSleep=false → stays asleep until manual input
+//  Now:  stand → sleep sets standSleep=true  → auto-wakes when lifted
+//        timer → sleep sets standSleep=false → stays asleep until manual input
 void SLEEPCheck()
 {
   bool onStand = !digitalRead(REED_PIN);
@@ -614,7 +614,7 @@ void SLEEPCheck()
     mode = MODE_OFF;
     armed = false;
     setTriacPower(0);
-    BUZZ(600, 1);
+    BUZZ(400, 1);
   }
 }
 
