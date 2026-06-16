@@ -129,10 +129,10 @@ void InfoScreen();
 void BUZZ(long duration = DEFAULT_BUZZ_MS, int buzzcount = 1);
 void SetupScreen();
 void setTriacPower(uint8_t pct);
-void setRotary(int rmin, int rmax, int rstep, int rvalue);
+void setRotary(float rmin, float rmax, float rstep, float rvalue);
 void MessageScreen(const char *Items[], uint8_t n);
 uint8_t MenuScreen(const char *Items[], uint8_t n, uint8_t selected);
-uint16_t InputScreen(const char *Items[]);
+uint16_t InputScreen(const char *Items[], bool isfloat = false);
 void processButton();
 void saveSettings();
 
@@ -167,6 +167,7 @@ bool longPress = false;
 
 float SmoothedTEMP = 0;
 float CurrentTemp = 0;
+float TempOffset;
 
 double Input = 0, Output = 0, Setpoint = 0;
 double aggKp = 40, aggKi = 0.8, aggKd = 6;
@@ -175,15 +176,13 @@ double consKp = 15, consKi = 0.5, consKd = 10;
 uint16_t SetTemp = TEMP_DEFAULT;
 uint16_t DefaultTemp = TEMP_DEFAULT;
 uint16_t SleepTemp = TEMP_SLEEP;
-int16_t rotaryMin, rotaryMax, rotaryStep, rotaryOffset, rotaryBaseValue;
+float rotaryMin, rotaryMax, rotaryStep, rotaryOffset, rotaryBaseValue;
 
 uint8_t mode = MODE_OFF;
 uint8_t fanOutput = 0;
-uint8_t TempOffset;
 uint8_t time2sleep = TIME2SLEEP;
 uint8_t time2off = TIME2OFF;
 uint8_t goneMinutes = 0;
-
 uint32_t sleepmillis = 0;
 uint32_t sensorPreviousMillis = 0;
 uint32_t protectPreviousMillis = 0;
@@ -290,7 +289,7 @@ void setTriacPower(uint8_t pct)
 
 void rotaryISR() { encoder.tick(); }
 
-void setRotary(int rmin, int rmax, int rstep, int rvalue)
+void setRotary(float rmin, float rmax, float rstep, float rvalue)
 {
   rotaryMin = rmin;
   rotaryMax = rmax;
@@ -299,10 +298,10 @@ void setRotary(int rmin, int rmax, int rstep, int rvalue)
   rotaryOffset = encoder.getPosition();
 }
 
-int getRotary()
+float getRotary()
 {
   int16_t delta = (int16_t)(encoder.getPosition() - rotaryOffset);
-  int16_t value = rotaryBaseValue + delta * rotaryStep;
+  float value = rotaryBaseValue + delta * rotaryStep;
   if (value < rotaryMin)
   {
     value = rotaryMin;
@@ -819,13 +818,15 @@ void MessageScreen(const char *Items[], uint8_t n)
 // ============================================================================
 //  INPUT SCREEN
 // ============================================================================
-uint16_t InputScreen(const char *Items[])
+uint16_t InputScreen(const char *Items[], bool isfloat)
 {
   bool lastbtn = !digitalRead(ENC_SW_PIN);
-  uint16_t value = 0;
+  float value = 0;
   do
   {
-    value = (uint16_t)getRotary();
+
+    value = getRotary();
+
     u8g.firstPage();
     do
     {
@@ -835,14 +836,26 @@ uint16_t InputScreen(const char *Items[])
       u8g.drawStr(0, 0, Items[0]);
       u8g.setCursor(0, 32);
       u8g.print(F("> "));
-      if (value == 0)
+
+      if (value == 0.0f)
+      {
         u8g.print(F("Disabled"));
+      }
       else
       {
-        u8g.print(value);
+        if (!isfloat)
+        {
+          int val = (int)value;
+          u8g.print(val);
+        }
+        else{
+          u8g.print(value);
+        }
         u8g.print(F(" "));
         u8g.print(Items[1]);
       }
+      
+
     } while (u8g.nextPage());
     if (lastbtn && digitalRead(ENC_SW_PIN))
     {
@@ -907,10 +920,8 @@ void TempScreen()
       SleepTemp = InputScreen(SleepTempItems);
       break;
     case 2:
-      // TC Offset: 0–100 °C added to raw reading for cold-junction compensation
-      // Measure actual tip temp with reference thermometer, adjust until they match
-      setRotary(0, 100, 1, TempOffset);
-      TempOffset = (uint8_t)InputScreen(OffsetItems);
+      setRotary(-100.0, 100.00, 0.10, TempOffset);
+      TempOffset = InputScreen(OffsetItems, true);
       break;
     default:
       repeat = false;
