@@ -58,7 +58,9 @@
 #define DISPLAY_INTERVAL 150
 
 #define FAN_COOL_SPEED 77
-#define FAN_OFF 0
+#define FAN_MIN 90
+#define FAN_MAX 255
+#define FAN_INV true
 
 #define BEEP_ENABLE true
 #define DEFAULT_BUZZ_MS 200
@@ -164,6 +166,7 @@ bool beepEnable = BEEP_ENABLE;
 bool pidActive = false;
 bool shortPress = false;
 bool longPress = false;
+bool onStand;
 
 float SmoothedTEMP = 0;
 float CurrentTemp = 0;
@@ -179,9 +182,10 @@ uint16_t SleepTemp = TEMP_SLEEP;
 float rotaryMin, rotaryMax, rotaryStep, rotaryOffset, rotaryBaseValue;
 
 uint8_t mode = MODE_OFF;
-uint8_t fanOutput = 0;
+
 uint8_t time2sleep = TIME2SLEEP;
 uint8_t time2off = TIME2OFF;
+uint8_t fanOutput;
 uint8_t goneMinutes = 0;
 uint32_t sleepmillis = 0;
 uint32_t sensorPreviousMillis = 0;
@@ -471,6 +475,8 @@ void SENSORCheck()
 {
   float rawTemp = thermocouple.readCelsius();
 
+  bool onStand = !digitalRead(REED_PIN);
+
   if (isnan(rawTemp)) // open thermocouple / wiring fault
   {
     if (armed)
@@ -546,19 +552,39 @@ void Thermostat()
 }
 
 // ============================================================================
-//  FAN CONTROL
+//  FAN CONTROL        min 90 max 255
 // ============================================================================
+
 void FanControl()
 {
-  uint8_t potPWM = (uint8_t)(analogRead(FAN_POT_PIN) * 255UL / 4095);
-  bool onStand = digitalRead(REED_PIN);
+
+  uint8_t potPWM = (uint8_t)(analogRead(FAN_POT_PIN) * 255UL / 4096);
+
+  potPWM = map(potPWM, 0, 255, FAN_MIN, FAN_MAX);
+
+  if (mode == MODE_COOLDOWN)
+  {
+    potPWM = FAN_MAX;
+    if (CurrentTemp - TEMP_COOL_THRESHOLD < 100)
+      mode = MODE_SLEEP;
+  }
 
   if (!armed || mode == MODE_OFF || mode == MODE_SLEEP || onStand)
-    fanOutput = (CurrentTemp > TEMP_COOL_THRESHOLD) ? FAN_COOL_SPEED : FAN_OFF;
+  {
+    if (CurrentTemp - TEMP_COOL_THRESHOLD > 100)
+    {
+      mode = MODE_COOLDOWN;
+      return;
+    }
+    fanOutput = (CurrentTemp > TEMP_COOL_THRESHOLD) ? FAN_COOL_SPEED : FAN_MIN;
+    analogWrite(FAN_PWM_PIN, (FAN_INV) ? 255 : 0); // FAN OFF
+    return;
+  }
   else
+  {
     fanOutput = potPWM;
-
-  analogWrite(FAN_PWM_PIN, fanOutput);
+    analogWrite(FAN_PWM_PIN, (FAN_INV) ? 255 - fanOutput : fanOutput);
+  }
 }
 
 // ============================================================================
@@ -569,7 +595,6 @@ void FanControl()
 //        timer → sleep sets standSleep=false → stays asleep until manual input
 void SLEEPCheck()
 {
-  bool onStand = !digitalRead(REED_PIN);
 
   if (mode == MODE_SLEEP && standSleep && !onStand) // STAND WAKE
   {
@@ -649,7 +674,14 @@ void LED_Handler()
 void MainScreen()
 {
   uint16_t dispTemp = (uint16_t)CurrentTemp;
-  uint8_t fanPct = (uint8_t)map(fanOutput, 0, 255, 0, 100);
+
+  uint8_t fanPct;
+
+  if (FAN_INV)
+    fanPct = (uint8_t)map(fanOutput, FAN_MIN, FAN_MAX, 0, 100);
+  else
+    fanPct = (uint8_t)map(fanOutput, FAN_MIN, FAN_MAX, 100, 0);
+
   uint8_t pwrPct = (uint8_t)Output;
 
   u8g.firstPage();
@@ -671,26 +703,29 @@ void MainScreen()
       u8g.drawButtonUTF8(0, 0, U8G2_BTN_INV, 15, 1, 1, "ARMED");
     }
 
-    u8g.setCursor(44, 0);
+    u8g.setCursor(90, 0);
     if (!armed)
-      u8g.print(F("     STBY"));
+      u8g.print(F("STBY"));
     else
       switch (mode)
       {
       case MODE_OFF:
-        u8g.print(F("      OFF"));
+        u8g.print(F("OFF"));
         break;
       case MODE_SLEEP:
-        u8g.print(F("     STBY"));
+        u8g.print(F("STBY"));
         break;
       case MODE_HOLD:
-        u8g.print(F("     HOLD"));
+        u8g.print(F("HOLD"));
         break;
       case MODE_RUN:
-        u8g.print(F("     HEAT"));
+        u8g.print(F("HEAT"));
+        break;
+      case MODE_COOLDOWN:
+        u8g.print(F("COOL"));
         break;
       default:
-        u8g.print(F("    -----"));
+        u8g.print(F("-----"));
         break;
       }
 
@@ -706,17 +741,16 @@ void MainScreen()
     }
     else
     {
-      u8g.setCursor((dispTemp < 10) ? 85 : (dispTemp < 100) ? 68
-                                                            : 48,
-                    17);
+      // clang-format off
+      u8g.setCursor((dispTemp < 10) ? 85 : (dispTemp < 100) ? 68 : 48,17);
       u8g.print(dispTemp);
+      
     }
 
     u8g.setFont(u8g2_font_9x15_tf);
     u8g.setFontPosTop();
     u8g.setCursor(106, 30);
-    u8g.print(F("\xb0"
-                "C"));
+    u8g.print(F("\xb0""C"));
 
     u8g.drawHLine(0, 48, 128);
 
@@ -735,14 +769,26 @@ void MainScreen()
       u8g.setCursor(80, 51);
     }
     u8g.print(SetTemp);
-    u8g.print(F("\xb0"
-                "C"));
+    u8g.print(F("\xb0""C"));
+
+    // clang-format on
 
     u8g.setCursor(0, 18);
     u8g.print(F("FAN"));
     u8g.setCursor(0, 33);
-    u8g.print(fanPct);
-    u8g.print(F("%"));
+    if (fanPct >= 99)
+    {
+      u8g.drawButtonUTF8(0, 34, U8G2_BTN_INV, 5, 1, 1, "MAX");
+    }
+    else if (fanPct == 0)
+    {
+      u8g.drawButtonUTF8(0, 34, U8G2_BTN_INV, 5, 1, 1, "OFF");
+    }
+    else
+    {
+      u8g.print(fanPct);
+      u8g.print(F("%"));
+    }
 
   } while (u8g.nextPage());
 }
@@ -848,13 +894,13 @@ float InputScreen(const char *Items[], bool isfloat)
           int val = (int)value;
           u8g.print(val);
         }
-        else{
+        else
+        {
           u8g.print(value);
         }
         u8g.print(F(" "));
         u8g.print(Items[1]);
       }
-      
 
     } while (u8g.nextPage());
     if (lastbtn && digitalRead(ENC_SW_PIN))
@@ -1073,6 +1119,7 @@ void setup()
   }
 
   analogWriteFrequency(25000);
+  analogReadResolution(12);
   enableDWT();
   loadSettings();
 
