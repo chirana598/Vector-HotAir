@@ -90,7 +90,7 @@ struct Settings
   uint8_t time2sleep;
   uint8_t time2off;
   bool beepEnable;
-  uint8_t tempOffset; // runtime-adjustable TC offset 0–100 °C
+  float tempOffset; // runtime-adjustable TC offset 0–100 °C
 };
 
 Settings settings;
@@ -132,7 +132,7 @@ void setTriacPower(uint8_t pct);
 void setRotary(float rmin, float rmax, float rstep, float rvalue);
 void MessageScreen(const char *Items[], uint8_t n);
 uint8_t MenuScreen(const char *Items[], uint8_t n, uint8_t selected);
-uint16_t InputScreen(const char *Items[], bool isfloat = false);
+float InputScreen(const char *Items[], bool isfloat = false);
 void processButton();
 void saveSettings();
 
@@ -818,7 +818,7 @@ void MessageScreen(const char *Items[], uint8_t n)
 // ============================================================================
 //  INPUT SCREEN
 // ============================================================================
-uint16_t InputScreen(const char *Items[], bool isfloat)
+float InputScreen(const char *Items[], bool isfloat)
 {
   bool lastbtn = !digitalRead(ENC_SW_PIN);
   float value = 0;
