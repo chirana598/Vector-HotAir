@@ -186,7 +186,7 @@ uint8_t mode = MODE_OFF;
 uint8_t time2sleep = TIME2SLEEP;
 uint8_t time2off = TIME2OFF;
 uint8_t fanOutput;
-uint8_t goneMinutes = 0;
+uint16_t goneSeconds = 0;
 uint32_t sleepmillis = 0;
 uint32_t sensorPreviousMillis = 0;
 uint32_t protectPreviousMillis = 0;
@@ -622,9 +622,9 @@ void SLEEPCheck()
     return;
   }
 
-  goneMinutes = (uint8_t)((millis() - sleepmillis) / 60000UL);
+  goneSeconds = (millis() - sleepmillis) / 1000UL;
 
-  if (mode != MODE_SLEEP && mode != MODE_OFF && time2sleep > 0 && goneMinutes >= time2sleep) // TIME SLEEP
+  if (mode != MODE_SLEEP && mode != MODE_OFF && time2sleep > 0 && (goneSeconds / 60) >= time2sleep) // TIME SLEEP
   {
     mode = MODE_SLEEP;
     armed = false;
@@ -633,7 +633,7 @@ void SLEEPCheck()
     BUZZ(400, 2);
   }
 
-  if (mode != MODE_OFF && time2off > 0 && goneMinutes >= time2off) // TIME OFF
+  if (mode != MODE_OFF && time2off > 0 && (goneSeconds / 60) >= time2off) // TIME OFF
   {
     mode = MODE_OFF;
     armed = false;
@@ -648,6 +648,7 @@ void SLEEPCheck()
 void LED_Handler()
 {
   bool r = HIGH, g = HIGH, b = HIGH;
+
   if (armed)
     switch (mode)
     {
@@ -663,6 +664,7 @@ void LED_Handler()
     default:
       break;
     }
+
   digitalWrite(LED_R_PIN, r);
   digitalWrite(LED_G_PIN, g);
   digitalWrite(LED_B_PIN, b);
@@ -701,6 +703,13 @@ void MainScreen()
     else
     {
       u8g.drawButtonUTF8(0, 0, U8G2_BTN_INV, 15, 1, 1, "ARMED");
+    }
+
+    u8g.setCursor(58, 0);
+
+    if (armed && (time2sleep * 60) - goneSeconds <= 60)
+    {
+      u8g.print((time2sleep * 60) - goneSeconds);
     }
 
     u8g.setCursor(90, 0);
