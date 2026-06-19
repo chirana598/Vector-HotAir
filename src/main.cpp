@@ -137,6 +137,7 @@ uint8_t MenuScreen(const char *Items[], uint8_t n, uint8_t selected);
 float InputScreen(const char *Items[], bool isfloat = false);
 void processButton();
 void saveSettings();
+void LED_BLINK(uint8_t color_pin, uint16_t duration);
 
 // ============================================================================
 //  MENU STRINGS
@@ -191,6 +192,7 @@ uint32_t sleepmillis = 0;
 uint32_t sensorPreviousMillis = 0;
 uint32_t protectPreviousMillis = 0;
 uint32_t displayPreviousMillis = 0;
+uint32_t LEDpreviousMillis = 0;
 uint32_t btnPressTime = 0;
 uint32_t firingDelayUS = HALF_CYCLE_US;
 
@@ -647,27 +649,91 @@ void SLEEPCheck()
 // ============================================================================
 void LED_Handler()
 {
-  bool r = HIGH, g = HIGH, b = HIGH;
+  uint8_t LED = 0; // 0 = BLINK || 1 = RED || 2 = GREEN || 3 = BLUE || 4 RED_BLNK 5 GREEN_BLNK 6 BLUE_BLNK
 
-  if (armed)
-    switch (mode)
+  switch (mode)
+  {
+  case MODE_OFF:
+    if (CurrentTemp > 60)
+      LED = 1;
+    break;
+
+  case MODE_SLEEP:
+    if (CurrentTemp > 60)
+      LED = 1;
+    else
     {
-    case MODE_SLEEP:
-      b = LOW;
-      break;
-    case MODE_RUN:
-      r = LOW;
-      break;
-    case MODE_HOLD:
-      g = LOW;
-      break;
-    default:
-      break;
+      LED_BLINK(LED_G_PIN, 2000);
+      LED = 5;
     }
 
-  digitalWrite(LED_R_PIN, r);
+    break;
+  case MODE_RUN:
+  {
+
+    LED_BLINK(LED_R_PIN, (uint16_t)map(Output, 100, 0, 100, 3000));
+    LED = 4;
+  }
+  break;
+
+  case MODE_HOLD:
+    LED = 1;
+    break;
+
+  case MODE_COOLDOWN:
+
+    LED_BLINK(LED_B_PIN, (uint16_t)map(fanOutput, FAN_MAX, FAN_MIN, 100, 3000));
+    LED = 6;
+    break;
+  }
+
+  if (LED != 4)
+    digitalWrite(LED_R_PIN, LED != 1 ? HIGH : LOW);
+  if (LED != 5)
+    digitalWrite(LED_G_PIN, LED != 2 ? HIGH : LOW);
+  if (LED != 6)
+    digitalWrite(LED_B_PIN, LED != 3 ? HIGH : LOW);
+
+  /*
+  bool r = HIGH, g = HIGH, b = HIGH;
+
+  switch (mode)
+  {
+  case MODE_SLEEP:
+    if (CurrentTemp < 60)
+      b = LOW;
+    break;
+
+  case MODE_RUN:
+    uint32_t CurrentMillis = millis();
+    uint8_t blinkspeed = 1; // Seconds
+    if (CurrentMillis - LEDpreviousMillis >= (blinkspeed * 1000))
+    {
+      digitalWrite(LED_R_PIN, !digitalRead(LED_R_PIN));
+      LEDpreviousMillis = CurrentMillis;
+    }
+    break;
+  case MODE_HOLD:
+  {
+    digitalWrite(LED_R_PIN, LOW);
+  }
+  break;
+  }
+
+  // digitalWrite(LED_R_PIN, r);
   digitalWrite(LED_G_PIN, g);
   digitalWrite(LED_B_PIN, b);
+  */
+}
+
+void LED_BLINK(uint8_t color_pin, uint16_t duration)
+{
+  uint32_t CurrentMillis = millis();
+  if (CurrentMillis - LEDpreviousMillis >= duration)
+  {
+    digitalWrite(color_pin, !digitalRead(color_pin));
+    LEDpreviousMillis = CurrentMillis;
+  }
 }
 
 // ============================================================================
@@ -713,30 +779,28 @@ void MainScreen()
     }
 
     u8g.setCursor(90, 0);
-    if (!armed)
+
+    switch (mode)
+    {
+    case MODE_OFF:
+      u8g.print(F("OFF"));
+      break;
+    case MODE_SLEEP:
       u8g.print(F("STBY"));
-    else
-      switch (mode)
-      {
-      case MODE_OFF:
-        u8g.print(F("OFF"));
-        break;
-      case MODE_SLEEP:
-        u8g.print(F("STBY"));
-        break;
-      case MODE_HOLD:
-        u8g.print(F("HOLD"));
-        break;
-      case MODE_RUN:
-        u8g.print(F("HEAT"));
-        break;
-      case MODE_COOLDOWN:
-        u8g.print(F("COOL"));
-        break;
-      default:
-        u8g.print(F("-----"));
-        break;
-      }
+      break;
+    case MODE_HOLD:
+      u8g.print(F("HOLD"));
+      break;
+    case MODE_RUN:
+      u8g.print(F("HEAT"));
+      break;
+    case MODE_COOLDOWN:
+      u8g.print(F("COOL"));
+      break;
+    default:
+      u8g.print(F("-----"));
+      break;
+    }
 
     u8g.drawHLine(0, 14, 128);
 
