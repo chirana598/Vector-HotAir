@@ -53,9 +53,9 @@
 #define TRIAC_PULSE_US 500
 #define ZC_BLANK_US 500
 
-#define SMOOTHIE 0.2f
+#define SMOOTHIE 0.02f
 #define SENSOR_INTERVAL 250
-#define DISPLAY_INTERVAL 150
+#define DISPLAY_INTERVAL 100
 
 #define FAN_COOL_SPEED 77
 #define FAN_MIN 90
@@ -190,8 +190,8 @@ uint8_t fanOutput;
 uint16_t goneSeconds = 0;
 uint32_t sleepmillis = 0;
 uint32_t sensorPreviousMillis = 0;
-uint32_t protectPreviousMillis = 0;
 uint32_t displayPreviousMillis = 0;
+
 uint32_t LEDpreviousMillis = 0;
 uint32_t btnPressTime = 0;
 uint32_t firingDelayUS = HALF_CYCLE_US;
@@ -426,12 +426,7 @@ void STARTCheck()
 // ============================================================================
 void Protect()
 {
-  unsigned long currentMillis = millis();
-  if (currentMillis - protectPreviousMillis >= 30000)
-  {
-    protectPreviousMillis = currentMillis;
-  }
-
+  
   if (armed && staticsafetycheck == true && dynamicsfetycheck == true)
   {
     digitalWrite(PROTECT_PIN, HIGH);
@@ -741,8 +736,7 @@ void LED_BLINK(uint8_t color_pin, uint16_t duration)
 // ============================================================================
 void MainScreen()
 {
-  uint16_t dispTemp = (uint16_t)CurrentTemp;
-
+  
   uint8_t fanPct;
 
   if (FAN_INV)
@@ -807,7 +801,7 @@ void MainScreen()
     u8g.setFont(u8g2_font_fub25_tf);
     u8g.setFontPosTop();
 
-    if (dispTemp > 450)
+    if (CurrentTemp > TEMP_MAX)
     {
       u8g.setCursor(35, 17);
       u8g.print(F("OVT"));
@@ -815,8 +809,8 @@ void MainScreen()
     else
     {
       // clang-format off
-      u8g.setCursor((dispTemp < 10) ? 85 : (dispTemp < 100) ? 68 : 48,17);
-      u8g.print(dispTemp);
+      u8g.setCursor((CurrentTemp < 10) ? 85 : (CurrentTemp < 100) ? 68 : 48,17);
+      u8g.print((uint16_t)CurrentTemp);
       
     }
 
