@@ -536,9 +536,9 @@ void Thermostat()
 
   uint16_t gap = (uint16_t)fabsf(Setpoint - Input);
   ctrl.SetTunings(
-      (gap < 15) ? consKp : aggKp,
-      (gap < 15) ? consKi : aggKi,
-      (gap < 15) ? consKd : aggKd);
+      (gap < 25) ? consKp : aggKp,
+      (gap < 25) ? consKi : aggKi,
+      (gap < 25) ? consKd : aggKd);
   ctrl.Compute();
 
   if (mode == MODE_RUN && gap <= 3)
@@ -768,7 +768,7 @@ void MainScreen()
 
     u8g.setCursor(58, 0);
 
-    if (armed && (time2sleep * 60) - goneSeconds <= 60)
+    if (time2sleep > 0 && armed && (time2sleep * 60) - goneSeconds <= 60)
     {
       u8g.print((time2sleep * 60) - goneSeconds);
     }
