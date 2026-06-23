@@ -174,8 +174,9 @@ float CurrentTemp = 0;
 float TempOffset;
 
 double Input = 0, Output = 0, Setpoint = 0;
-double aggKp = 40, aggKi = 0.8, aggKd = 6;
-double consKp = 15, consKi = 0.5, consKd = 10;
+
+double aggKp = 20, aggKi = 0.8, aggKd = 12;
+double consKp = 8, consKi = 0.2, consKd = 15;
 
 uint16_t SetTemp = TEMP_DEFAULT;
 uint16_t DefaultTemp = TEMP_DEFAULT;
@@ -472,7 +473,7 @@ void SENSORCheck()
 {
   float rawTemp = thermocouple.readCelsius();
 
-  bool onStand = !digitalRead(REED_PIN);
+  onStand = !digitalRead(REED_PIN);
 
   if (isnan(rawTemp)) // open thermocouple / wiring fault
   {
